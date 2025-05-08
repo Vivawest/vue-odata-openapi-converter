@@ -1,0 +1,7 @@
+version: '3.8'
+
+services:
+  pdf-gen:
+    build: .
+    ports:
+      - "5371:80"
