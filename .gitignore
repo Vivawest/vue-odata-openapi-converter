@@ -2,3 +2,5 @@ temp
 backend-port.txt
 node_modules
 dist
+.DS_Store
+*.log
