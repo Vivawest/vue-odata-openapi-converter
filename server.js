@@ -16,7 +16,7 @@ app.use(express.json());
 
 app.post("/convert-to-openapi", (req, res) => {
   const { xmlData } = req.body;
-  console.log(req.body);
+  const customHeaders = JSON.parse(req.headers["custom-headers"]);
 
   if (!fs.existsSync(tempDir)) {
     fs.mkdirSync(tempDir, { recursive: true });
@@ -52,7 +52,36 @@ app.post("/convert-to-openapi", (req, res) => {
           return res.status(500).json({ error: "Failed to read OpenAPI file" });
         }
 
-        res.json({ openapi: data });
+        if (!customHeaders) {
+          return res.json({
+            openapi: data,
+          });
+        }
+
+        const parsedHeaders = JSON.parse(customHeaders);
+        let openApiJson = JSON.parse(data);
+
+        for (const [, pathValue] of Object.entries(openApiJson.paths)) {
+          for (const [, operation] of Object.entries(pathValue)) {
+            if (!operation.parameters) {
+              operation.parameters = [];
+            }
+
+            for (const [key, value] of Object.entries(parsedHeaders)) {
+              operation.parameters.push({
+                in: "header",
+                name: key,
+                schema: {
+                  type: "string",
+                  default: value,
+                },
+              });
+            }
+          }
+        }
+        res.json({
+          openapi: JSON.stringify(openApiJson),
+        });
       });
     });
   });
@@ -62,5 +91,8 @@ const server = app.listen(0, () => {
   console.log("Listening on port:", server.address().port);
 
   // Write the port to a file
-  fs.writeFileSync(path.resolve(__dirname, "backend-port.txt"), server.address().port.toString());
+  fs.writeFileSync(
+    path.resolve(__dirname, "backend-port.txt"),
+    server.address().port.toString(),
+  );
 });

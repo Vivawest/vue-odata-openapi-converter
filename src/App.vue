@@ -1,17 +1,26 @@
 <template>
   <div class="flex flex-col gap-4 mt-2">
     <div class="flex w-full px-20 justify-between">
-      <div></div>
-      <!-- TODO: Fix header problems -->
-      <!-- <BaseTextarea
-        id="custom-headers"
-        name="custom-headers"
-        class="w-96"
-        :rows="3"
-        label="Custom Headers (JSON)"
-        v-model="customHeaders"
-      /> -->
-      <BaseButton class="w-fit h-fit" @click="handleClear()"> Clear all</BaseButton>
+      <div>
+        <BaseTextarea
+          id="custom-headers"
+          name="custom-headers"
+          class="w-96"
+          :rows="3"
+          label="Custom Headers (JSON)"
+          :borderColorClass="
+            isCustomHeaderValid ? 'border-gray-300' : 'border-red-500'
+          "
+          v-model="customHeaders"
+        />
+        <p v-if="!isCustomHeaderValid" class="text-red-500">
+          Invalid JSON format in Custom Headers.
+        </p>
+      </div>
+
+      <BaseButton class="w-fit h-fit" @click="handleClear()">
+        Clear all
+      </BaseButton>
     </div>
     <!-- TODO: Fix url problems -->
     <!-- <div class="flex w-screen h-full justify-center items-end gap-4 px-20">
@@ -27,7 +36,11 @@
         label="XML Data"
         v-model="xmlData"
       />
-      <BaseButton class="h-fit w-fit" :disabled="!xmlData" @click="handleClick(true)">
+      <BaseButton
+        class="h-fit w-fit"
+        :disabled="!xmlData || !isCustomHeaderValid"
+        @click="handleClick(true)"
+      >
         Ok
       </BaseButton>
     </div>
@@ -52,7 +65,11 @@
         v-model="openApiData"
       />
     </div>
-    <SpinnerAnimation v-if="isLoading" borderWidth="border-24" class="size-96 self-center" />
+    <SpinnerAnimation
+      v-if="isLoading"
+      borderWidth="border-24"
+      class="size-96 self-center"
+    />
     <div v-if="errorMessage">
       <span>
         <p class="text-red-500">{{ errorMessage }}</p>
@@ -63,9 +80,9 @@
 
 <script setup lang="ts">
 import BaseButton from "@/components/inputs/BaseButton.vue";
-import BaseInput from "@/components/inputs/BaseInput.vue";
+//import BaseInput from "@/components/inputs/BaseInput.vue";
 import BaseTextarea from "@/components/inputs/BaseTextarea.vue";
-import { ref } from "vue";
+import { ref, computed } from "vue";
 import SpinnerAnimation from "./components/animations/SpinnerAnimation.vue";
 
 const url = ref("");
@@ -81,6 +98,17 @@ function handleClear() {
   customHeaders.value = "";
   errorMessage.value = "";
 }
+
+const isCustomHeaderValid = computed(() => {
+  if (customHeaders.value.trim()) {
+    try {
+      JSON.parse(customHeaders.value);
+    } catch {
+      return false;
+    }
+  }
+  return true;
+});
 
 const isCopied = ref(false);
 function copyToClipboard(data: string) {
@@ -112,8 +140,13 @@ async function convertToOpenApi() {
   try {
     const response = await fetch("/convert-to-openapi", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ xmlData: xmlData.value }),
+      headers: {
+        "Content-Type": "application/json",
+        "Custom-Headers": JSON.stringify(customHeaders.value),
+      },
+      body: JSON.stringify({
+        xmlData: xmlData.value,
+      }),
     });
 
     if (!response.ok) {
@@ -133,21 +166,9 @@ async function handleClick(isXML: boolean = false) {
   isLoading.value = true;
   errorMessage.value = "";
 
-  let parsedHeaders = {};
-  try {
-    parsedHeaders = customHeaders.value?.trim() ? JSON.parse(customHeaders.value) : {};
-  } catch (error) {
-    errorMessage.value = error;
-    isLoading.value = false;
-    return;
-  }
-
   if (!isXML) {
     try {
-      const response = await fetch(url.value, {
-        method: "GET",
-        headers: parsedHeaders,
-      });
+      const response = await fetch(url.value);
       const text = await response.text();
       xmlData.value = text;
     } catch (error) {
@@ -158,7 +179,6 @@ async function handleClick(isXML: boolean = false) {
   }
 
   if (xmlData.value) await convertToOpenApi();
-
   isLoading.value = false;
 }
 </script>

@@ -1,8 +1,12 @@
 <template>
   <div class="relative last:flex flex-col gap-0.5">
-    <label v-if="label" :for="id" class="pointer-events-none" :class="labelClass">{{
-      label
-    }}</label>
+    <label
+      v-if="label"
+      :for="id"
+      class="pointer-events-none"
+      :class="labelClass"
+      >{{ label }}</label
+    >
     <textarea
       :id
       class="text-gray border rounded-[10px] px-3 py-1.5 w-full placeholder:text-gray placeholder:opacity-40 focus:outline-petrol"
@@ -24,7 +28,10 @@
       @blur="$emit('blur-sm')"
     >
     </textarea>
-    <div v-if="$slots.icon" class="absolute top-6 py-2 px-1 text-gray opacity-40">
+    <div
+      v-if="$slots.icon"
+      class="absolute top-6 py-2 px-1 text-gray opacity-40"
+    >
       <slot name="icon"></slot>
     </div>
   </div>

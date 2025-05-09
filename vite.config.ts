@@ -21,7 +21,8 @@ export default defineConfig({
       "/convert-to-openapi": {
         target: `http://localhost:${backendPort}`,
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/convert-to-openapi/, "/convert-to-openapi"),
+        rewrite: (path) =>
+          path.replace(/^\/convert-to-openapi/, "/convert-to-openapi"),
       },
     },
   },

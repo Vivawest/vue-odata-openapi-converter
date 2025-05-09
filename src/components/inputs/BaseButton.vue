@@ -13,7 +13,10 @@
 
     <template v-else>
       <SpinnerAnimation v-if="type === 'icon'" class="size-5" />
-      <EllipsisAnimation v-else :color-class="type === 'primary' ? 'bg-white' : 'bg-petrol'" />
+      <EllipsisAnimation
+        v-else
+        :color-class="type === 'primary' ? 'bg-white' : 'bg-petrol'"
+      />
     </template>
   </button>
 </template>

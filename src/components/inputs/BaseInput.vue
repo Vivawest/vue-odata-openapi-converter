@@ -1,9 +1,16 @@
 <template>
   <div class="flex flex-col gap-2">
-    <div class="relative flex-col flex gap-3" :class="{ 'opacity-50': disabled }">
-      <label v-if="label" :for="id" class="pointer-events-none" :class="labelClass">{{
-        label
-      }}</label>
+    <div
+      class="relative flex-col flex gap-3"
+      :class="{ 'opacity-50': disabled }"
+    >
+      <label
+        v-if="label"
+        :for="id"
+        class="pointer-events-none"
+        :class="labelClass"
+        >{{ label }}</label
+      >
       <input
         :id
         :maxlength
@@ -58,7 +65,10 @@
       v-if="invalid && invalidMessage"
       class="text-red-600 text-sm font-medium flex gap-1 items-start"
     >
-      <Icon icon="material-symbols:error-outline" class="text-red-500 size-4 shrink-0 mt-[3px]" />
+      <Icon
+        icon="material-symbols:error-outline"
+        class="text-red-500 size-4 shrink-0 mt-[3px]"
+      />
       {{ invalidMessage }}
     </div>
   </div>
@@ -123,7 +133,8 @@ const isPasswordVisible = ref(false);
 function togglePasswordVisibility() {
   if (inputElement.value) {
     isPasswordVisible.value = !isPasswordVisible.value;
-    inputElement.value.type = inputElement.value.type === "password" ? "text" : "password";
+    inputElement.value.type =
+      inputElement.value.type === "password" ? "text" : "password";
   }
 }
 
@@ -162,7 +173,9 @@ function validateInput() {
         default:
           parsedValue = value;
       }
-      inputValidationSchema[props.type as keyof typeof inputValidationSchema].parse(parsedValue);
+      inputValidationSchema[
+        props.type as keyof typeof inputValidationSchema
+      ].parse(parsedValue);
       isValid.value = true;
     }
   } catch (err) {
@@ -171,7 +184,11 @@ function validateInput() {
 }
 
 watch(model, (newValue) => {
-  if (props.type === "number" && props.max !== undefined && Number(newValue) > props.max) {
+  if (
+    props.type === "number" &&
+    props.max !== undefined &&
+    Number(newValue) > props.max
+  ) {
     model.value = props.max;
   }
 });
