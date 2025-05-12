@@ -14,8 +14,14 @@ if (!fs.existsSync(tempDir)) {
 
 app.use(express.json());
 
-app.post("/convert-to-openapi", (req, res) => {
-  const { xmlData } = req.body;
+app.post("/convert-to-openapi", async (req, res) => {
+  let { xmlData, url } = req.body;
+
+  if (url) {
+    const response = await fetch(url);
+    xmlData = await response.text();
+  }
+
   const customHeaders = JSON.parse(req.headers["custom-headers"]);
 
   if (!fs.existsSync(tempDir)) {
@@ -54,6 +60,7 @@ app.post("/convert-to-openapi", (req, res) => {
 
         if (!customHeaders) {
           return res.json({
+            xmlData: JSON.stringify(xmlData),
             openapi: data,
           });
         }
@@ -80,6 +87,7 @@ app.post("/convert-to-openapi", (req, res) => {
           }
         }
         res.json({
+          xmlData: JSON.stringify(xmlData),
           openapi: JSON.stringify(openApiJson),
         });
       });

@@ -1,47 +1,61 @@
 <template>
-  <div class="flex flex-col gap-4 mt-2">
+  <div class="flex flex-col gap-4 mt-2 items-center">
     <div class="flex w-full px-20 justify-between">
       <div>
         <BaseTextarea
           id="custom-headers"
           name="custom-headers"
-          class="w-96"
-          :rows="3"
+          class="w-md"
+          :rows="5"
           label="Custom Headers (JSON)"
           :borderColorClass="
             isCustomHeaderValid ? 'border-gray-300' : 'border-red-500'
           "
+          :disabled="isOpenApiGenerated"
           v-model="customHeaders"
         />
         <p v-if="!isCustomHeaderValid" class="text-red-500">
           Invalid JSON format in Custom Headers.
         </p>
       </div>
-
-      <BaseButton class="w-fit h-fit" @click="handleClear()">
-        Clear all
-      </BaseButton>
     </div>
-    <!-- TODO: Fix url problems -->
-    <!-- <div class="flex w-screen h-full justify-center items-end gap-4 px-20">
-      <BaseInput id="url-input" name="url-input" class="w-full" label="Odata URL" v-model="url" />
-      <BaseButton class="w-fit h-fit" :disabled="!url" @click="handleClick()"> Ok </BaseButton>
-    </div> -->
-    <div class="flex w-screen items-end px-20 gap-4">
+    <div class="flex flex-col w-screen h-full justify-center px-20">
+      <BaseInput
+        id="url-input"
+        name="url-input"
+        class="w-full"
+        label="Odata URL"
+        :disabled="isOpenApiGenerated"
+        v-model="url"
+      />
+      <p v-if="showUrlXmlConflict" class="text-red-500">
+        Please provide either an OData URL or XML Data, not both.
+      </p>
+    </div>
+    <div class="flex flex-col w-screen px-20">
       <BaseTextarea
         id="xml-data"
         name="xml-data"
         class="w-full"
         :rows="5"
         label="XML Data"
+        :disabled="isOpenApiGenerated"
         v-model="xmlData"
       />
+      <p v-if="showUrlXmlConflict" class="text-red-500">
+        Please provide either an OData URL or XML Data, not both.
+      </p>
+    </div>
+    <div class="flex gap-4">
       <BaseButton
-        class="h-fit w-fit"
-        :disabled="!xmlData || !isCustomHeaderValid"
-        @click="handleClick(true)"
+        class="w-fit"
+        :disabled="isConvertDisabled"
+        @click="handleClick()"
       >
-        Ok
+        Convert to OpenAPI
+      </BaseButton>
+      <BaseButton class="w-fit h-fit" @click="handleClear()">
+        Clear all
       </BaseButton>
     </div>
   </div>
@@ -53,15 +67,15 @@
           <span v-if="isCopied">Copied!</span>
           <span v-else>Copy to Clipboard</span>
         </BaseButton>
-        <BaseButton class="w-fit" @click="downloadOpenApi(openApiData)"
-          >Download OpenAPI</BaseButton
-        >
+        <BaseButton class="w-fit" @click="downloadOpenApi(openApiData)">
+          Download OpenAPI
+        </BaseButton>
       </div>
       <BaseTextarea
         id="open-api-data"
         name="open-api-data"
         disabled
-        :rows="20"
+        :rows="18"
         v-model="openApiData"
       />
     </div>
@@ -80,7 +94,7 @@
 
 <script setup lang="ts">
 import BaseButton from "@/components/inputs/BaseButton.vue";
-//import BaseInput from "@/components/inputs/BaseInput.vue";
+import BaseInput from "@/components/inputs/BaseInput.vue";
 import BaseTextarea from "@/components/inputs/BaseTextarea.vue";
 import { ref, computed } from "vue";
 import SpinnerAnimation from "./components/animations/SpinnerAnimation.vue";
@@ -109,6 +123,20 @@ const isCustomHeaderValid = computed(() => {
   }
   return true;
 });
+
+const isOpenApiGenerated = computed(() => openApiData.value !== "");
+
+const showUrlXmlConflict = computed(
+  () =>
+    url.value && xmlData.value && !isOpenApiGenerated.value && !isLoading.value,
+);
+
+const isConvertDisabled = computed(
+  () =>
+    (!xmlData.value && !url.value) ||
+    showUrlXmlConflict.value ||
+    isOpenApiGenerated.value,
+);
 
 const isCopied = ref(false);
 function copyToClipboard(data: string) {
@@ -145,6 +173,7 @@ async function convertToOpenApi() {
         "Custom-Headers": JSON.stringify(customHeaders.value),
       },
       body: JSON.stringify({
+        url: url.value,
         xmlData: xmlData.value,
       }),
     });
@@ -156,29 +185,18 @@ async function convertToOpenApi() {
 
     const data = await response.json();
     openApiData.value = data.openapi;
+    if (url.value) xmlData.value = data.xmlData;
   } catch (error) {
     errorMessage.value = error;
   }
 }
 
 const isLoading = ref(false);
-async function handleClick(isXML: boolean = false) {
+async function handleClick() {
   isLoading.value = true;
   errorMessage.value = "";
 
-  if (!isXML) {
-    try {
-      const response = await fetch(url.value);
-      const text = await response.text();
-      xmlData.value = text;
-    } catch (error) {
-      errorMessage.value = error;
-      isLoading.value = false;
-      return;
-    }
-  }
-
-  if (xmlData.value) await convertToOpenApi();
+  await convertToOpenApi();
   isLoading.value = false;
 }
 </script>

@@ -1,5 +1,8 @@
 <template>
-  <div class="relative last:flex flex-col gap-0.5">
+  <div
+    class="relative last:flex flex-col gap-0.5"
+    :class="{ 'opacity-50': disabled }"
+  >
     <label
       v-if="label"
       :for="id"
@@ -14,7 +17,6 @@
         backgroundColorClass,
         borderColorClass,
         {
-          'opacity-50': disabled,
           'pl-5': $slots.icon,
         },
       ]"

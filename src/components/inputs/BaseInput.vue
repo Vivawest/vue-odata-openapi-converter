@@ -1,9 +1,6 @@
 <template>
   <div class="flex flex-col gap-2">
-    <div
-      class="relative flex-col flex gap-3"
-      :class="{ 'opacity-50': disabled }"
-    >
+    <div class="relative flex-col flex" :class="{ 'opacity-50': disabled }">
       <label
         v-if="label"
         :for="id"
