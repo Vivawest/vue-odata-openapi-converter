@@ -11,9 +11,10 @@
           :borderColorClass="
             isCustomHeaderValid ? 'border-gray-300' : 'border-red-500'
           "
-          :disabled="isOpenApiGenerated"
+          :disabled="openApiData !== undefined"
           v-model="customHeaders"
         />
+
         <p v-if="!isCustomHeaderValid" class="text-red-500">
           Invalid JSON format in Custom Headers.
         </p>
@@ -25,10 +26,10 @@
         name="url-input"
         class="w-full"
         label="Odata URL"
-        :disabled="isOpenApiGenerated"
+        :disabled="openApiData !== undefined"
         v-model="url"
       />
-      <p v-if="showUrlXmlConflict" class="text-red-500">
+      <p v-if="isUrlXmlConflict" class="text-red-500">
         Please provide either an OData URL or XML Data, not both.
       </p>
     </div>
@@ -39,10 +40,10 @@
         class="w-full"
         :rows="5"
         label="XML Data"
-        :disabled="isOpenApiGenerated"
+        :disabled="openApiData !== undefined"
         v-model="xmlData"
       />
-      <p v-if="showUrlXmlConflict" class="text-red-500">
+      <p v-if="isUrlXmlConflict" class="text-red-500">
         Please provide either an OData URL or XML Data, not both.
       </p>
     </div>
@@ -50,7 +51,7 @@
       <BaseButton
         class="w-fit"
         :disabled="isConvertDisabled"
-        @click="handleClick()"
+        @click="convertToOpenApi()"
       >
         Convert to OpenAPI
       </BaseButton>
@@ -80,15 +81,11 @@
       />
     </div>
     <SpinnerAnimation
-      v-if="isLoading"
+      v-else-if="isLoading"
       borderWidth="border-24"
       class="size-96 self-center"
     />
-    <div v-if="errorMessage">
-      <span>
-        <p class="text-red-500">{{ errorMessage }}</p>
-      </span>
-    </div>
+    <p v-else class="text-red-500">{{ errorMessage }}</p>
   </div>
 </template>
 
@@ -99,22 +96,22 @@ import BaseTextarea from "@/components/inputs/BaseTextarea.vue";
 import { ref, computed } from "vue";
 import SpinnerAnimation from "./components/animations/SpinnerAnimation.vue";
 
-const url = ref("");
-const xmlData = ref("");
-const openApiData = ref("");
-const customHeaders = ref("");
-const errorMessage = ref("");
+const url = ref<string | undefined>(undefined);
+const xmlData = ref<string | undefined>(undefined);
+const openApiData = ref<string | undefined>(undefined);
+const customHeaders = ref<string | undefined>(undefined);
+const errorMessage = ref<string | undefined>(undefined);
 
 function handleClear() {
-  url.value = "";
-  xmlData.value = "";
-  openApiData.value = "";
-  customHeaders.value = "";
-  errorMessage.value = "";
+  url.value = undefined;
+  xmlData.value = undefined;
+  openApiData.value = undefined;
+  customHeaders.value = undefined;
+  errorMessage.value = undefined;
 }
 
 const isCustomHeaderValid = computed(() => {
-  if (customHeaders.value.trim()) {
+  if (customHeaders.value?.trim()) {
     try {
       JSON.parse(customHeaders.value);
     } catch {
@@ -124,19 +121,15 @@ const isCustomHeaderValid = computed(() => {
   return true;
 });
 
-const isOpenApiGenerated = computed(() => openApiData.value !== "");
-
-const showUrlXmlConflict = computed(
-  () =>
-    url.value && xmlData.value && !isOpenApiGenerated.value && !isLoading.value,
+const isUrlXmlConflict = computed(
+  () => url.value && xmlData.value && !openApiData.value && !isLoading.value,
 );
 
-const isConvertDisabled = computed(
-  () =>
-    (!xmlData.value && !url.value) ||
-    showUrlXmlConflict.value ||
-    isOpenApiGenerated.value,
-);
+const isConvertDisabled = computed(() => {
+  const noInputProvided = !xmlData.value && !url.value;
+
+  return noInputProvided || isUrlXmlConflict.value || isLoading.value;
+});
 
 const isCopied = ref(false);
 function copyToClipboard(data: string) {
@@ -164,39 +157,33 @@ function downloadOpenApi(data: string) {
   window.URL.revokeObjectURL(url);
 }
 
-async function convertToOpenApi() {
-  try {
-    const response = await fetch("/convert-to-openapi", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Custom-Headers": JSON.stringify(customHeaders.value),
-      },
-      body: JSON.stringify({
-        url: url.value,
-        xmlData: xmlData.value,
-      }),
-    });
-
-    if (!response.ok) {
-      errorMessage.value = `Error: ${response.statusText}`;
-      return;
-    }
-
-    const data = await response.json();
-    openApiData.value = data.openapi;
-    if (url.value) xmlData.value = data.xmlData;
-  } catch (error) {
-    errorMessage.value = error;
-  }
-}
-
 const isLoading = ref(false);
-async function handleClick() {
+async function convertToOpenApi() {
   isLoading.value = true;
   errorMessage.value = "";
 
-  await convertToOpenApi();
+  const response = await fetch("/convert-to-openapi", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Custom-Headers": JSON.stringify(customHeaders.value ?? ""),
+    },
+    body: JSON.stringify({
+      url: url.value ?? "",
+      xmlData: xmlData.value ?? "",
+    }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json();
+    errorMessage.value = errorData.error || "An error occurred";
+    isLoading.value = false;
+    return;
+  }
+
+  const data = await response.json();
+  openApiData.value = data.openapi;
+  if (url.value) xmlData.value = data.xmlData;
   isLoading.value = false;
 }
 </script>
