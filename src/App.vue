@@ -1,47 +1,62 @@
 <template>
-  <div class="flex flex-col gap-4 mt-2">
+  <div class="flex flex-col gap-4 mt-2 items-center">
     <div class="flex w-full px-20 justify-between">
       <div>
         <BaseTextarea
           id="custom-headers"
           name="custom-headers"
-          class="w-96"
-          :rows="3"
+          class="w-md"
+          :rows="5"
           label="Custom Headers (JSON)"
           :borderColorClass="
             isCustomHeaderValid ? 'border-gray-300' : 'border-red-500'
           "
+          :disabled="openApiData !== undefined"
           v-model="customHeaders"
         />
+
         <p v-if="!isCustomHeaderValid" class="text-red-500">
           Invalid JSON format in Custom Headers.
         </p>
       </div>
-
-      <BaseButton class="w-fit h-fit" @click="handleClear()">
-        Clear all
-      </BaseButton>
     </div>
-    <!-- TODO: Fix url problems -->
-    <!-- <div class="flex w-screen h-full justify-center items-end gap-4 px-20">
-      <BaseInput id="url-input" name="url-input" class="w-full" label="Odata URL" v-model="url" />
-      <BaseButton class="w-fit h-fit" :disabled="!url" @click="handleClick()"> Ok </BaseButton>
-    </div> -->
-    <div class="flex w-screen items-end px-20 gap-4">
+    <div class="flex flex-col w-screen h-full justify-center px-20">
+      <BaseInput
+        id="url-input"
+        name="url-input"
+        class="w-full"
+        label="Odata URL"
+        :disabled="openApiData !== undefined"
+        v-model="url"
+      />
+      <p v-if="isUrlXmlConflict" class="text-red-500">
+        Please provide either an OData URL or XML Data, not both.
+      </p>
+    </div>
+    <div class="flex flex-col w-screen px-20">
       <BaseTextarea
         id="xml-data"
         name="xml-data"
         class="w-full"
         :rows="5"
         label="XML Data"
+        :disabled="openApiData !== undefined"
         v-model="xmlData"
       />
+      <p v-if="isUrlXmlConflict" class="text-red-500">
+        Please provide either an OData URL or XML Data, not both.
+      </p>
+    </div>
+    <div class="flex gap-4">
       <BaseButton
-        class="h-fit w-fit"
-        :disabled="!xmlData || !isCustomHeaderValid"
-        @click="handleClick(true)"
+        class="w-fit"
+        :disabled="isConvertDisabled"
+        @click="convertToOpenApi()"
       >
-        Ok
+        Convert to OpenAPI
+      </BaseButton>
+      <BaseButton class="w-fit h-fit" @click="handleClear()">
+        Clear all
       </BaseButton>
     </div>
   </div>
@@ -53,54 +68,50 @@
           <span v-if="isCopied">Copied!</span>
           <span v-else>Copy to Clipboard</span>
         </BaseButton>
-        <BaseButton class="w-fit" @click="downloadOpenApi(openApiData)"
-          >Download OpenAPI</BaseButton
-        >
+        <BaseButton class="w-fit" @click="downloadOpenApi(openApiData)">
+          Download OpenAPI
+        </BaseButton>
       </div>
       <BaseTextarea
         id="open-api-data"
         name="open-api-data"
         disabled
-        :rows="20"
+        :rows="18"
         v-model="openApiData"
       />
     </div>
     <SpinnerAnimation
-      v-if="isLoading"
+      v-else-if="isLoading"
       borderWidth="border-24"
       class="size-96 self-center"
     />
-    <div v-if="errorMessage">
-      <span>
-        <p class="text-red-500">{{ errorMessage }}</p>
-      </span>
-    </div>
+    <p v-else class="text-red-500">{{ errorMessage }}</p>
   </div>
 </template>
 
 <script setup lang="ts">
 import BaseButton from "@/components/inputs/BaseButton.vue";
-//import BaseInput from "@/components/inputs/BaseInput.vue";
+import BaseInput from "@/components/inputs/BaseInput.vue";
 import BaseTextarea from "@/components/inputs/BaseTextarea.vue";
 import { ref, computed } from "vue";
 import SpinnerAnimation from "./components/animations/SpinnerAnimation.vue";
 
-const url = ref("");
-const xmlData = ref("");
-const openApiData = ref("");
-const customHeaders = ref("");
-const errorMessage = ref("");
+const url = ref<string | undefined>(undefined);
+const xmlData = ref<string | undefined>(undefined);
+const openApiData = ref<string | undefined>(undefined);
+const customHeaders = ref<string | undefined>(undefined);
+const errorMessage = ref<string | undefined>(undefined);
 
 function handleClear() {
-  url.value = "";
-  xmlData.value = "";
-  openApiData.value = "";
-  customHeaders.value = "";
-  errorMessage.value = "";
+  url.value = undefined;
+  xmlData.value = undefined;
+  openApiData.value = undefined;
+  customHeaders.value = undefined;
+  errorMessage.value = undefined;
 }
 
 const isCustomHeaderValid = computed(() => {
-  if (customHeaders.value.trim()) {
+  if (customHeaders.value?.trim()) {
     try {
       JSON.parse(customHeaders.value);
     } catch {
@@ -108,6 +119,16 @@ const isCustomHeaderValid = computed(() => {
     }
   }
   return true;
+});
+
+const isUrlXmlConflict = computed(
+  () => url.value && xmlData.value && !openApiData.value && !isLoading.value,
+);
+
+const isConvertDisabled = computed(() => {
+  const noInputProvided = !xmlData.value && !url.value;
+
+  return noInputProvided || isUrlXmlConflict.value || isLoading.value;
 });
 
 const isCopied = ref(false);
@@ -136,49 +157,33 @@ function downloadOpenApi(data: string) {
   window.URL.revokeObjectURL(url);
 }
 
-async function convertToOpenApi() {
-  try {
-    const response = await fetch("/convert-to-openapi", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Custom-Headers": JSON.stringify(customHeaders.value),
-      },
-      body: JSON.stringify({
-        xmlData: xmlData.value,
-      }),
-    });
-
-    if (!response.ok) {
-      errorMessage.value = `Error: ${response.statusText}`;
-      return;
-    }
-
-    const data = await response.json();
-    openApiData.value = data.openapi;
-  } catch (error) {
-    errorMessage.value = error;
-  }
-}
-
 const isLoading = ref(false);
-async function handleClick(isXML: boolean = false) {
+async function convertToOpenApi() {
   isLoading.value = true;
   errorMessage.value = "";
 
-  if (!isXML) {
-    try {
-      const response = await fetch(url.value);
-      const text = await response.text();
-      xmlData.value = text;
-    } catch (error) {
-      errorMessage.value = error;
-      isLoading.value = false;
-      return;
-    }
+  const response = await fetch("/convert-to-openapi", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Custom-Headers": JSON.stringify(customHeaders.value ?? ""),
+    },
+    body: JSON.stringify({
+      url: url.value ?? "",
+      xmlData: xmlData.value ?? "",
+    }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json();
+    errorMessage.value = errorData.error || "An error occurred";
+    isLoading.value = false;
+    return;
   }
 
-  if (xmlData.value) await convertToOpenApi();
+  const data = await response.json();
+  openApiData.value = data.openapi;
+  if (url.value) xmlData.value = data.xmlData;
   isLoading.value = false;
 }
 </script>
