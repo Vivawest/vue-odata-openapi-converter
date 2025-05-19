@@ -24,6 +24,12 @@ export default defineConfig({
         rewrite: (path) =>
           path.replace(/^\/convert-to-openapi/, "/convert-to-openapi"),
       },
+      "/process-openapi": {
+        target: `http://localhost:${backendPort}`,
+        changeOrigin: true,
+        rewrite: (path) =>
+          path.replace(/^\/process-openapi/, "/process-openapi"),
+      },
     },
   },
   resolve: {

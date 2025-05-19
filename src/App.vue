@@ -1,7 +1,7 @@
 <template>
-  <div class="flex flex-col gap-4 mt-2 items-center">
-    <div class="flex w-full px-20 justify-between">
-      <div>
+  <div class="flex w-screen h-screen overflow-hidden p-2">
+    <div class="flex-1/2 mx-4">
+      <div class="flex flex-col gap-4">
         <BaseTextarea
           id="custom-headers"
           name="custom-headers"
@@ -14,78 +14,72 @@
           :disabled="openApiData !== undefined"
           v-model="customHeaders"
         />
-
         <p v-if="!isCustomHeaderValid" class="text-red-500">
           Invalid JSON format in Custom Headers.
         </p>
+        <BaseInput
+          id="url-input"
+          name="url-input"
+          class="w-full"
+          label="Odata URL"
+          :disabled="openApiData !== undefined"
+          v-model="url"
+        />
+        <p v-if="isUrlXmlConflict" class="text-red-500">
+          Please provide either an OData URL or XML Data, not both.
+        </p>
+        <BaseTextarea
+          id="xml-data"
+          name="xml-data"
+          class="w-full"
+          :rows="5"
+          label="XML Data"
+          :disabled="openApiData !== undefined"
+          v-model="xmlData"
+        />
+        <p v-if="isUrlXmlConflict" class="text-red-500">
+          Please provide either an OData URL or XML Data, not both.
+        </p>
+        <div class="flex gap-4">
+          <BaseButton
+            class="w-fit"
+            :disabled="isConvertDisabled"
+            @click="convertToOpenApi()"
+          >
+            Convert to OpenAPI
+          </BaseButton>
+          <BaseButton class="w-fit h-fit" @click="handleClear()">
+            Clear all
+          </BaseButton>
+        </div>
       </div>
-    </div>
-    <div class="flex flex-col w-screen h-full justify-center px-20">
-      <BaseInput
-        id="url-input"
-        name="url-input"
-        class="w-full"
-        label="Odata URL"
-        :disabled="openApiData !== undefined"
-        v-model="url"
-      />
-      <p v-if="isUrlXmlConflict" class="text-red-500">
-        Please provide either an OData URL or XML Data, not both.
-      </p>
-    </div>
-    <div class="flex flex-col w-screen px-20">
-      <BaseTextarea
-        id="xml-data"
-        name="xml-data"
-        class="w-full"
-        :rows="5"
-        label="XML Data"
-        :disabled="openApiData !== undefined"
-        v-model="xmlData"
-      />
-      <p v-if="isUrlXmlConflict" class="text-red-500">
-        Please provide either an OData URL or XML Data, not both.
-      </p>
-    </div>
-    <div class="flex gap-4">
-      <BaseButton
-        class="w-fit"
-        :disabled="isConvertDisabled"
-        @click="convertToOpenApi()"
-      >
-        Convert to OpenAPI
-      </BaseButton>
-      <BaseButton class="w-fit h-fit" @click="handleClear()">
-        Clear all
-      </BaseButton>
-    </div>
-  </div>
-  <div v-if="isLoading || openApiData" class="border mx-10 my-5"></div>
-  <div class="flex flex-col w-screen px-20 gap-2">
-    <div v-if="openApiData" class="flex flex-col gap-2">
-      <div class="flex gap-2">
-        <BaseButton class="w-38" @click="copyToClipboard(openApiData)">
-          <span v-if="isCopied">Copied!</span>
-          <span v-else>Copy to Clipboard</span>
-        </BaseButton>
-        <BaseButton class="w-fit" @click="downloadOpenApi(openApiData)">
-          Download OpenAPI
-        </BaseButton>
+      <div v-if="isLoading || openApiData" class="border my-5"></div>
+      <div v-if="openApiData" class="flex flex-col gap-2">
+        <div class="flex gap-2">
+          <BaseButton class="w-38" @click="copyToClipboard(openApiData)">
+            <span v-if="isCopied">Copied!</span>
+            <span v-else>Copy to Clipboard</span>
+          </BaseButton>
+          <BaseButton class="w-fit" @click="downloadOpenApi(openApiData)">
+            Download OpenAPI
+          </BaseButton>
+        </div>
+        <BaseTextarea
+          id="open-api-data"
+          name="open-api-data"
+          disabled
+          :rows="16"
+          v-model="openApiData"
+        />
       </div>
-      <BaseTextarea
-        id="open-api-data"
-        name="open-api-data"
-        disabled
-        :rows="18"
-        v-model="openApiData"
+      <SpinnerAnimation
+        v-else-if="isLoading"
+        borderWidth="border-24"
+        class="size-96 self-center"
       />
+      <p v-else class="text-red-500">{{ errorMessage }}</p>
     </div>
-    <SpinnerAnimation
-      v-else-if="isLoading"
-      borderWidth="border-24"
-      class="size-96 self-center"
-    />
-    <p v-else class="text-red-500">{{ errorMessage }}</p>
+    <EndpointReader class="overflow-auto w-full border-l" :openApiData />
   </div>
 </template>
 
@@ -95,6 +89,7 @@ import BaseInput from "@/components/inputs/BaseInput.vue";
 import BaseTextarea from "@/components/inputs/BaseTextarea.vue";
 import { ref, computed } from "vue";
 import SpinnerAnimation from "./components/animations/SpinnerAnimation.vue";
+import EndpointReader from "./components/EndpointReader.vue";
 
 const url = ref<string | undefined>(undefined);
 const xmlData = ref<string | undefined>(undefined);
@@ -128,7 +123,12 @@ const isUrlXmlConflict = computed(
 const isConvertDisabled = computed(() => {
   const noInputProvided = !xmlData.value && !url.value;
 
-  return noInputProvided || isUrlXmlConflict.value || isLoading.value;
+  return (
+    noInputProvided ||
+    isUrlXmlConflict.value ||
+    isLoading.value ||
+    !!openApiData.value
+  );
 });
 
 const isCopied = ref(false);

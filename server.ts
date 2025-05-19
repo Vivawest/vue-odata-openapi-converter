@@ -5,6 +5,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { XMLValidator } from "fast-xml-parser";
 import { OpenAPIV3 } from "openapi-types";
+import Oas from "oas";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -49,7 +50,7 @@ app.post("/convert-to-openapi", async (req, res) => {
   }
 
   const metadataPath = path.join(tempDir, `metadata-${Date.now()}.xml`);
-  const openapiPath = path.join(tempDir, `ZCRM_ODATA_SRV-${Date.now()}.json`);
+  const openapiPath = path.join(tempDir, `openapi.json`);
   fs.writeFileSync(metadataPath, xmlData);
 
   const command = `odata-openapi3 --target "${openapiPath}" "${metadataPath}"`;
@@ -97,6 +98,24 @@ app.post("/convert-to-openapi", async (req, res) => {
       openapi: JSON.stringify(openApiJson),
     });
   });
+});
+
+app.post("/process-openapi", async (req, res) => {
+  try {
+    const openApi = fs.readFileSync("temp/openApi.json", "utf8");
+    if (!openApi) {
+      return res.status(500).json({ error: "Failed to read OpenAPI file" });
+    }
+
+    const openApiJson = JSON.parse(openApi);
+
+    const oas = new Oas(openApiJson);
+    await oas.dereference();
+
+    res.json(JSON.stringify({ dereferencedData: oas }));
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
 const server = app.listen(0, () => {
