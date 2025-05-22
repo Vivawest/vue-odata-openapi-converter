@@ -66,8 +66,7 @@
                             </span>
                             <p
                               v-if="
-                                param.schema &&
-                                'items' in param.schema &&
+                                isArraySchemaObject(param.schema) &&
                                 'enum' in param.schema.items
                               "
                               class="text-sm"
