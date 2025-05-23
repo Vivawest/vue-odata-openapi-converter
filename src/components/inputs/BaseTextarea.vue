@@ -12,7 +12,7 @@
     >
     <textarea
       :id
-      class="text-gray border rounded-[10px] px-3 py-1.5 w-full placeholder:text-gray placeholder:opacity-40 focus:outline-petrol"
+      class="text-gray border rounded-[10px] px-3 py-1.5 w-full h-full placeholder:text-gray placeholder:opacity-40 focus:outline-petrol"
       :class="[
         backgroundColorClass,
         borderColorClass,
