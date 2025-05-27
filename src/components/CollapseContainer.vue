@@ -15,9 +15,9 @@
             :class="{ 'rotate-90': !isCollapsed }"
           />
         </slot>
-        <h2 class="text-gray text-lg" :class="titleStyle">
+        <h4 class="text-gray text-lg" :class="titleStyle">
           {{ title }}
-        </h2>
+        </h4>
       </div>
       <div class="flex justify-between w-full overflow-hidden mr-10">
         <slot name="expandTitle" :isCollapsed><div></div></slot>
@@ -30,7 +30,7 @@
       />
     </div>
     <Transition name="collapse">
-      <div v-if="!isCollapsed">
+      <div v-show="!isCollapsed">
         <slot></slot>
       </div>
     </Transition>

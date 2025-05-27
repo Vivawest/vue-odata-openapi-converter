@@ -1,6 +1,6 @@
 <template>
   <div v-if="oasApiDocument" class="relative overflow-y-scroll">
-    <div class="p-4">
+    <div id="endPointReader" class="p-4">
       <h2>{{ oasApiDocument.info.title }}</h2>
       <span v-html="formatDescription(oasApiDocument.info.description)"></span>
       <div v-for="tag in oasApiDocument.tags" :key="tag.name">
@@ -33,21 +33,21 @@
                         />
                       </template>
                       <template #expandTitle>
-                        <div class="flex gap-x-4 items-center flex-wrap w-full">
-                          <p class="font-bold truncate">
+                        <ul class="flex gap-x-4 items-center flex-wrap w-full">
+                          <li class="font-bold truncate">
                             {{ path }}
-                          </p>
-                          <p class="text-sm">{{ method.summary }}</p>
-                        </div>
+                          </li>
+                          <li class="text-sm">{{ method.summary }}</li>
+                        </ul>
                       </template>
-                      <div
+                      <table
                         v-if="method.parameters || methods?.parameters"
                         class="flex flex-col m-4"
                       >
-                        <div class="flex border-b gap-8 p-2">
-                          <span class="max-w-44 min-w-44">Name</span>
-                          <span>Description</span>
-                        </div>
+                        <tr class="flex border-b gap-8 p-2">
+                          <th class="max-w-44 min-w-44">Name</th>
+                          <th>Description</th>
+                        </tr>
                         <div>
                           <template v-if="isParameterObject(method.parameters)">
                             <div
@@ -57,10 +57,10 @@
                               :key="index"
                               class="group"
                             >
-                              <div
+                              <tr
                                 class="flex gap-8 items-center p-2 group-even:bg-gray-100"
                               >
-                                <div class="flex flex-col max-w-44 min-w-44">
+                                <td class="flex flex-col max-w-44 min-w-44">
                                   <span>{{ param.name }}</span>
                                   <div
                                     v-if="isArraySchemaObject(param.schema)"
@@ -73,9 +73,9 @@
                                       &lt;{{ param.schema.items.type }}&gt;
                                     </span>
                                   </div>
-                                  <p class="text-sm">({{ param.in }})</p>
-                                </div>
-                                <div class="flex flex-col">
+                                  <span class="text-sm">({{ param.in }})</span>
+                                </td>
+                                <td class="flex flex-col">
                                   <span
                                     v-html="
                                       formatDescription(param.description)
@@ -94,8 +94,8 @@
                                     Available values :
                                     {{ param.schema.items.enum?.join(", ") }}
                                   </p>
-                                </div>
-                              </div>
+                                </td>
+                              </tr>
                             </div>
                           </template>
                           <template
@@ -106,17 +106,18 @@
                               :key="param?.name"
                               class="group"
                             >
-                              <div
+                              <tr
                                 class="flex gap-8 items-center p-2 text-sm group-even:bg-gray-100"
                               >
-                                <div class="flex flex-col max-w-44 min-w-44">
+                                <td class="flex flex-col max-w-44 min-w-44">
                                   <div class="flex gap-2">
-                                    <span class="font-bold text-base">
-                                      {{ param.name }}</span
-                                    >
+                                    <strong class="font-bold text-base">
+                                      {{ param.name }}
+                                    </strong>
                                     <span
                                       v-if="param.required"
                                       class="text-xs text-red text-nowrap"
+                                      style="color: red"
                                     >
                                       * required
                                     </span>
@@ -129,13 +130,13 @@
                                     <span>({{ param.schema.format }})</span>
                                   </div>
                                   <span>{{ param.in }}</span>
-                                </div>
-                                <div>{{ param.description }}</div>
-                              </div>
+                                </td>
+                                <td>{{ param.description }}</td>
+                              </tr>
                             </div>
                           </template>
                         </div>
-                      </div>
+                      </table>
                       <div v-else class="mt-2">No parameters</div>
                     </CollapseContainer>
                   </div>
@@ -158,6 +159,14 @@
         @change="toggleAll()"
       />
       <div class="flex">
+        <BaseButton class="text-nowrap" @click="copyToClipboard()">
+          <Icon
+            icon="material-symbols:content-copy-outline"
+            class="size-6 mr-1"
+          />
+          <span v-if="isCopied">Copied!</span>
+          <span v-else>Copy to Clipboard</span>
+        </BaseButton>
         <BaseButton class="w-fit h-fit ml-4" @click="convertOpenApiData()">
           <Icon icon="ic:baseline-autorenew" class="size-6 mr-1" />
           Update OpenAPI
@@ -185,6 +194,25 @@ const oasApiDocument = ref<OpenAPIV3_1.Document>();
 const isAllChecked = ref(true);
 const selectedOperations = ref<Record<string, string[]>>({});
 const isNotFullyChecked = ref(false);
+
+const isCopied = ref(false);
+function copyToClipboard() {
+  const container = document.querySelector("#endPointReader");
+  if (!container) return;
+  const clone = container.cloneNode(true) as HTMLElement;
+
+  clone.querySelectorAll("table, th, td").forEach((el) => {
+    el.setAttribute("style", "border: 1px solid;");
+  });
+
+  const html = clone.innerHTML;
+  const blob = new Blob([html], { type: "text/html" });
+  const data = [new ClipboardItem({ "text/html": blob })];
+  navigator.clipboard.write(data).then(() => {
+    isCopied.value = true;
+    setTimeout(() => (isCopied.value = false), 1500);
+  });
+}
 
 function convertOpenApiData() {
   if (!oasApiDocument.value) return;
