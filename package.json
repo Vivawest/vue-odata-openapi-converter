@@ -4,9 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "concurrently \"npm run dev:server\" \"npm run dev:frontend\"",
+    "dev": "concurrently \"npm run dev:server\" \"sleep 1 && npm run dev:frontend\"",
     "dev:frontend": "vite",
-    "dev:server": "node server.ts",
+    "dev:server": "npx tsx server.ts",
     "build": "vite build"
   },
   "dependencies": {
