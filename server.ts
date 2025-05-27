@@ -112,7 +112,7 @@ app.post("/process-openapi", async (req, res) => {
     const oas = new Oas(openApiJson);
     await oas.dereference();
 
-    res.json(JSON.stringify({ dereferencedData: oas }));
+    res.json(JSON.stringify({ dereferencedData: oas.api }));
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
