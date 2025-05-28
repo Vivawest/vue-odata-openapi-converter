@@ -1,135 +1,237 @@
 <template>
-  <div class="p-4" v-if="oasApiDocument">
-    <h1>{{ oasApiDocument.info.title }}</h1>
-    <span v-html="formatDescription(oasApiDocument.info.description)"></span>
-    <div v-for="tag in oasApiDocument.tags" :key="tag.name">
-      <h3 class="my-4">{{ tag.name }}</h3>
-      <template v-if="oasApiDocument?.paths">
-        <div
-          v-for="[path, methods] in Object.entries(oasApiDocument?.paths)"
-          :key="path"
-        >
-          <template v-if="methods">
-            <div
-              v-for="[operation, method] in Object.entries(methods)"
-              :key="operation"
-            >
-              <template v-if="typeof method !== 'string' && 'tags' in method">
-                <CollapseContainer
-                  v-if="method.tags?.includes(tag.name)"
-                  :title="operation.toUpperCase()"
-                  class="mb-2"
-                >
-                  <template #expandTitle>
-                    <div class="flex gap-4 items-center">
-                      <p class="font-bold">{{ path }}</p>
-                      <p class="text-sm">{{ method.summary }}</p>
-                    </div>
-                  </template>
+  <div v-if="oasApiDocument" class="relative overflow-y-scroll">
+    <div class="p-4">
+      <h2>{{ oasApiDocument.info.title }}</h2>
+      <span v-html="formatDescription(oasApiDocument.info.description)"></span>
+      <div v-for="tag in oasApiDocument.tags" :key="tag.name">
+        <h3 class="my-3">{{ tag.name }}</h3>
+        <template v-if="oasApiDocument?.paths">
+          <div
+            v-for="[path, methods] in Object.entries(oasApiDocument?.paths)"
+            :key="path"
+          >
+            <template v-if="methods">
+              <div
+                v-for="[operation, method] in Object.entries(methods)"
+                :key="operation"
+              >
+                <template v-if="typeof method !== 'string' && 'tags' in method">
                   <div
-                    v-if="method.parameters || methods?.parameters"
-                    class="flex flex-col m-4"
+                    v-if="method.tags?.includes(tag.name)"
+                    class="flex gap-2 items-center mb-2"
                   >
-                    <div class="flex border-b gap-8 p-2">
-                      <span class="max-w-44 min-w-44">Name</span>
-                      <span>Description</span>
-                    </div>
-                    <template v-if="isParameterObject(method.parameters)">
+                    <CollapseContainer :title="operation.toUpperCase()">
+                      <template #expandStart>
+                        <BaseCheckbox
+                          :id="`${path}-${operation}`"
+                          :name="`${path}-${operation}`"
+                          class="mr-2"
+                          :modelValue="
+                            selectedOperations[path]?.includes(operation)
+                          "
+                          @click.stop="toggleOperations(path, operation)"
+                        />
+                      </template>
+                      <template #expandTitle>
+                        <div class="flex gap-x-4 items-center flex-wrap w-full">
+                          <p class="font-bold truncate">
+                            {{ path }}
+                          </p>
+                          <p class="text-sm">{{ method.summary }}</p>
+                        </div>
+                      </template>
                       <div
-                        v-for="[index, param] in Object.entries(
-                          method.parameters,
-                        )"
-                        :key="index"
+                        v-if="method.parameters || methods?.parameters"
+                        class="flex flex-col m-4"
                       >
-                        <div class="flex gap-8 items-center p-2">
-                          <div class="flex flex-col max-w-44 min-w-44">
-                            <span>{{ param.name }}</span>
+                        <div class="flex border-b gap-8 p-2">
+                          <span class="max-w-44 min-w-44">Name</span>
+                          <span>Description</span>
+                        </div>
+                        <div>
+                          <template v-if="isParameterObject(method.parameters)">
                             <div
-                              v-if="isArraySchemaObject(param.schema)"
-                              class="flex text-sm"
+                              v-for="[index, param] in Object.entries(
+                                method.parameters,
+                              )"
+                              :key="index"
+                              class="group"
                             >
-                              <span>
-                                {{ param.schema?.type }}
-                              </span>
-                              <span v-if="'type' in param.schema.items">
-                                &lt;{{ param.schema.items.type }}&gt;
-                              </span>
+                              <div
+                                class="flex gap-8 items-center p-2 group-even:bg-gray-100"
+                              >
+                                <div class="flex flex-col max-w-44 min-w-44">
+                                  <span>{{ param.name }}</span>
+                                  <div
+                                    v-if="isArraySchemaObject(param.schema)"
+                                    class="flex text-sm"
+                                  >
+                                    <span>
+                                      {{ param.schema?.type }}
+                                    </span>
+                                    <span v-if="'type' in param.schema.items">
+                                      &lt;{{ param.schema.items.type }}&gt;
+                                    </span>
+                                  </div>
+                                  <p class="text-sm">({{ param.in }})</p>
+                                </div>
+                                <div class="flex flex-col">
+                                  <span
+                                    v-html="
+                                      formatDescription(param.description)
+                                    "
+                                  ></span>
+                                  <span v-if="param.example" class="text-sm">
+                                    Example: {{ param.example }}
+                                  </span>
+                                  <p
+                                    v-if="
+                                      isArraySchemaObject(param.schema) &&
+                                      'enum' in param.schema.items
+                                    "
+                                    class="text-sm"
+                                  >
+                                    Available values :
+                                    {{ param.schema.items.enum?.join(", ") }}
+                                  </p>
+                                </div>
+                              </div>
                             </div>
-                            <p class="text-sm">({{ param.in }})</p>
-                          </div>
-                          <div class="flex flex-col">
-                            <span
-                              v-html="formatDescription(param.description)"
-                            ></span>
-                            <span v-if="param.example" class="text-sm">
-                              Example: {{ param.example }}
-                            </span>
-                            <p
-                              v-if="
-                                isArraySchemaObject(param.schema) &&
-                                'enum' in param.schema.items
-                              "
-                              class="text-sm"
-                            >
-                              Available values :
-                              {{ param.schema.items.enum?.join(", ") }}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    </template>
-                    <template v-if="isParameterObject(methods?.parameters)">
-                      <div
-                        v-for="param in methods?.parameters"
-                        :key="param?.name"
-                        class="flex gap-8 items-center p-2 text-sm"
-                      >
-                        <div class="flex flex-col max-w-44 min-w-44">
-                          <div class="flex gap-2">
-                            <span class="font-bold text-base">
-                              {{ param.name }}</span
-                            >
-                            <span
-                              v-if="param.required"
-                              class="text-xs text-red text-nowrap"
-                            >
-                              * required
-                            </span>
-                          </div>
-                          <div
-                            v-if="isNonArraySchemaObject(param.schema)"
-                            class="flex"
+                          </template>
+                          <template
+                            v-if="isParameterObject(methods?.parameters)"
                           >
-                            <span>{{ param.schema.type }}</span>
-                            <span>({{ param.schema.format }})</span>
-                          </div>
-                          <span>{{ param.in }}</span>
+                            <div
+                              v-for="param in methods?.parameters"
+                              :key="param?.name"
+                              class="group"
+                            >
+                              <div
+                                class="flex gap-8 items-center p-2 text-sm group-even:bg-gray-100"
+                              >
+                                <div class="flex flex-col max-w-44 min-w-44">
+                                  <div class="flex gap-2">
+                                    <span class="font-bold text-base">
+                                      {{ param.name }}</span
+                                    >
+                                    <span
+                                      v-if="param.required"
+                                      class="text-xs text-red text-nowrap"
+                                    >
+                                      * required
+                                    </span>
+                                  </div>
+                                  <div
+                                    v-if="isNonArraySchemaObject(param.schema)"
+                                    class="flex"
+                                  >
+                                    <span>{{ param.schema.type }}</span>
+                                    <span>({{ param.schema.format }})</span>
+                                  </div>
+                                  <span>{{ param.in }}</span>
+                                </div>
+                                <div>{{ param.description }}</div>
+                              </div>
+                            </div>
+                          </template>
                         </div>
-                        <div>{{ param.description }}</div>
                       </div>
-                    </template>
+                      <div v-else class="mt-2">No parameters</div>
+                    </CollapseContainer>
                   </div>
-                  <div v-else class="mt-2">No parameters</div>
-                </CollapseContainer>
-              </template>
-            </div>
-          </template>
-        </div>
-      </template>
+                </template>
+              </div>
+            </template>
+          </div>
+        </template>
+      </div>
+    </div>
+    <div
+      class="h-20 bg-gray-100 sticky bottom-0 border-t-2 flex items-center justify-between px-4"
+    >
+      <BaseCheckbox
+        id="checkbox-all"
+        name="checkbox-all"
+        label="All"
+        :modelValue="isAllChecked"
+        :disabled-icon="isNotFullyChecked ? 'mdi:minus' : ''"
+        @change="toggleAll()"
+      />
+      <div class="flex">
+        <BaseButton class="w-fit h-fit ml-4" @click="convertOpenApiData()">
+          <Icon icon="ic:baseline-autorenew" class="size-6 mr-1" />
+          Update OpenAPI
+        </BaseButton>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from "vue";
+import { onMounted, ref } from "vue";
 import CollapseContainer from "./CollapseContainer.vue";
 import Oas from "oas";
 import type { OAS31Document } from "oas/types";
 import type { OpenAPIV3_1 } from "openapi-types";
+import BaseCheckbox from "./inputs/BaseCheckbox.vue";
+import BaseButton from "./inputs/BaseButton.vue";
+import reducer from "oas/reducer";
+import { Icon } from "@iconify/vue";
 
-const props = defineProps<{
-  openApiData: string | undefined;
-}>();
+const openApiData = defineModel<string | undefined>("modelValue");
+
+const oasApiDocument = ref<OpenAPIV3_1.Document>();
+
+const isAllChecked = ref(true);
+const selectedOperations = ref<Record<string, string[]>>({});
+const isNotFullyChecked = ref(false);
+
+function convertOpenApiData() {
+  if (!oasApiDocument.value) return;
+
+  openApiData.value = JSON.stringify(
+    reducer(oasApiDocument.value, { paths: selectedOperations.value }),
+  );
+}
+
+function addOrRemoveOperation(path: string, operation: string) {
+  const ops = selectedOperations.value[path] ?? [];
+  const idx = ops.indexOf(operation);
+  if (idx === -1) {
+    selectedOperations.value[path] = [...ops, operation];
+  } else {
+    const newOps = [...ops];
+    newOps.splice(idx, 1);
+    if (newOps.length) {
+      selectedOperations.value[path] = newOps;
+    } else {
+      delete selectedOperations.value[path];
+      isNotFullyChecked.value = true;
+      isAllChecked.value = false;
+    }
+  }
+}
+
+function toggleOperations(path: string, operation: string) {
+  addOrRemoveOperation(path, operation);
+}
+
+function toggleAll() {
+  selectedOperations.value = {};
+
+  const paths = oasApiDocument.value?.paths;
+  if (!isAllChecked.value && paths) {
+    for (const [path, methods] of Object.entries(paths)) {
+      if (!methods) continue;
+      for (const [operation, method] of Object.entries(methods)) {
+        if (typeof method !== "string" && "tags" in method) {
+          addOrRemoveOperation(path, operation);
+        }
+      }
+    }
+  }
+  isAllChecked.value = !isAllChecked.value;
+}
 
 function isParameterObject(
   param?: unknown[],
@@ -176,29 +278,28 @@ function formatDescription(description?: string): string {
   );
 }
 
-const oasApiDocument = ref<OpenAPIV3_1.Document>();
+onMounted(async () => {
+  try {
+    const response = await fetch("/process-openapi", {
+      method: "POST",
+    });
+    const data = await response.json();
+    const oas = new Oas(JSON.parse(data).dereferencedData.api);
+    oasApiDocument.value = oas.api as OAS31Document;
+    const paths = oasApiDocument.value?.paths;
+    if (!paths) return [];
 
-watch(
-  () => props.openApiData,
-  async () => {
-    if (props.openApiData) {
-      try {
-        const response = await fetch("/process-openapi", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-        });
-        const data = await response.json();
-        const oas = new Oas(JSON.parse(data).dereferencedData.api);
-        oasApiDocument.value = oas.api as OAS31Document;
-      } catch (err) {
-        console.error("Failed to parse OpenAPI data:", err);
+    selectedOperations.value = {};
+    for (const [path, methods] of Object.entries(paths)) {
+      if (!methods) continue;
+      for (const [operation, method] of Object.entries(methods)) {
+        if (typeof method !== "string" && "tags" in method) {
+          addOrRemoveOperation(path, operation);
+        }
       }
-    } else {
-      oasApiDocument.value = undefined;
     }
-  },
-  { immediate: true },
-);
+  } catch (err) {
+    console.error("Failed to parse OpenAPI data:", err);
+  }
+});
 </script>
