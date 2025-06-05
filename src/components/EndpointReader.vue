@@ -198,43 +198,62 @@ import reducer from "oas/reducer";
 import { Icon } from "@iconify/vue";
 
 const openApiData = defineModel<string | undefined>("modelValue");
-
 const oasApiDocument = ref<OpenAPIV3_1.Document>();
 
-const isAllChecked = ref(true);
 const selectedOperations = ref<Record<string, string[]>>({});
 const selectedTags = ref<string[]>([]);
+
+const isAllChecked = ref(true);
 const isNotFullyChecked = ref(false);
 
-function toggleTag(tagName: string) {
+function getOperationsByTagName(tagName: string): [string, string][] {
   const paths = oasApiDocument.value?.paths;
-  if (!paths) return;
+  if (!paths) return [];
 
-  const matchingOperations = Object.entries(paths).flatMap(([path, methods]) =>
-    !methods
-      ? []
-      : Object.entries(methods)
-          .filter(([, method]) => methodHasTag(method, tagName))
-          .map(([operation]) => [path, operation] as [string, string]),
-  );
+  const matchingOperations: [string, string][] = [];
+  for (const [path, methods] of Object.entries(paths)) {
+    if (!methods) continue;
+    for (const [operation, method] of Object.entries(methods)) {
+      if (methodHasTag(method, tagName)) {
+        matchingOperations.push([path, operation]);
+      }
+    }
+  }
+  return matchingOperations;
+}
 
+function addTag(tagName: string) {
+  selectedTags.value.push(tagName);
+  const matchingOperations = getOperationsByTagName(tagName);
+
+  matchingOperations.forEach(([path, operation]) => {
+    const selectedOperation = selectedOperations.value[path] ?? [];
+    if (!selectedOperation.includes(operation)) {
+      selectedOperations.value[path] = [...selectedOperation, operation];
+    }
+  });
+}
+
+function removeTag(tagName: string) {
+  selectedTags.value = selectedTags.value.filter((tag) => tag !== tagName);
+  const matchingOperations = getOperationsByTagName(tagName);
+
+  matchingOperations.forEach(([path, operation]) => {
+    const selectedOperation = selectedOperations.value[path] ?? [];
+    selectedOperations.value[path] = selectedOperation.filter(
+      (operationInList) => operationInList !== operation,
+    );
+    if (selectedOperations.value[path].length === 0) {
+      delete selectedOperations.value[path];
+    }
+  });
+}
+
+function toggleTag(tagName: string) {
   if (selectedTags.value.includes(tagName)) {
-    selectedTags.value = selectedTags.value.filter((tag) => tag !== tagName);
-    matchingOperations.forEach(([path, operation]) => {
-      const ops = selectedOperations.value[path] ?? [];
-      selectedOperations.value[path] = ops.filter((op) => op !== operation);
-      if (selectedOperations.value[path].length === 0) {
-        delete selectedOperations.value[path];
-      }
-    });
+    removeTag(tagName);
   } else {
-    selectedTags.value.push(tagName);
-    matchingOperations.forEach(([path, operation]) => {
-      if (!selectedOperations.value[path]) selectedOperations.value[path] = [];
-      if (!selectedOperations.value[path].includes(operation)) {
-        selectedOperations.value[path].push(operation);
-      }
-    });
+    addTag(tagName);
   }
 }
 
@@ -244,6 +263,7 @@ function copyToClipboard() {
   if (!container) return;
   const clone = container.cloneNode(true) as HTMLElement;
 
+  // Remove unselected Operations
   clone
     .querySelectorAll('[id^="collapse-container-"]')
     .forEach((collapseEl) => {
@@ -255,6 +275,7 @@ function copyToClipboard() {
       }
     });
 
+  // Remove unselected Tags
   clone.querySelectorAll("#tag").forEach((tagEl) => {
     const tagName = tagEl.querySelector("h3")?.textContent?.trim();
     if (tagName && !selectedTags.value.includes(tagName)) {
@@ -262,6 +283,7 @@ function copyToClipboard() {
     }
   });
 
+  // Add styles to tables and cells
   clone.querySelectorAll("table, th, td").forEach((el) => {
     el.setAttribute("style", "border: 1px solid;");
   });
@@ -395,7 +417,7 @@ watch(
       Object.keys(selectedOperations.value).length ===
       Object.keys(oasApiDocument.value?.paths ?? {}).length;
     isNotFullyChecked.value =
-      Object.keys(selectedOperations.value).length > 0 && !isAllChecked.value;
+      !isAllChecked.value && Object.keys(selectedOperations.value).length !== 0;
   },
   { deep: true },
 );
