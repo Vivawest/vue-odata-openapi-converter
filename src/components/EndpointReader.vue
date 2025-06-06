@@ -5,13 +5,16 @@
       <span v-html="formatDescription(oasApiDocument.info.description)"></span>
       <div v-for="tag in oasApiDocument.tags" :key="tag.name">
         <div id="tag" class="flex gap-3">
-          <h3 class="my-3">{{ tag.name }}</h3>
+          <h3 v-if="isCopyMode || selectedTags.includes(tag.name)" class="my-3">
+            {{ tag.name }}
+          </h3>
           <BaseCheckbox
             :id="tag.name"
             :name="tag.name"
             class="mr-2"
             :modelValue="selectedTags.includes(tag.name)"
-            @change="toggleTag(tag.name)"
+            :disabled-icon="isTagNotFullyChecked(tag.name) ? 'mdi:minus' : ''"
+            @click.stop="toggleTag(tag.name)"
           />
         </div>
         <template v-if="oasApiDocument?.paths">
@@ -32,6 +35,10 @@
                   "
                 >
                   <CollapseContainer
+                    v-if="
+                      isCopyMode ||
+                      selectedOperations[path]?.includes(operation)
+                    "
                     :id="`collapse-container-${path}-${operation}`"
                     :title="operation.toUpperCase()"
                     class="flex gap-2 items-center mb-2"
@@ -44,7 +51,9 @@
                         :modelValue="
                           selectedOperations[path]?.includes(operation)
                         "
-                        @click.stop="addOrRemoveOperation(path, operation)"
+                        @click.stop="
+                          addOrRemoveOperation(path, operation, tag.name)
+                        "
                       />
                     </template>
                     <template #expandTitle>
@@ -187,7 +196,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref, watch } from "vue";
+import { nextTick, onMounted, ref, watch } from "vue";
 import CollapseContainer from "./CollapseContainer.vue";
 import Oas from "oas";
 import type { OAS31Document } from "oas/types";
@@ -205,6 +214,16 @@ const selectedTags = ref<string[]>([]);
 
 const isAllChecked = ref(true);
 const isNotFullyChecked = ref(false);
+
+function isTagNotFullyChecked(tagName: string): boolean {
+  const operation = getOperationsByTagName(tagName);
+  const selected = operation.filter(([path, operation]) =>
+    selectedOperations.value[path]?.includes(operation),
+  );
+
+  if (selected.length === 0) return false;
+  return selected.length > 0 && selected.length < operation.length;
+}
 
 function getOperationsByTagName(tagName: string): [string, string][] {
   const paths = oasApiDocument.value?.paths;
@@ -258,30 +277,17 @@ function toggleTag(tagName: string) {
 }
 
 const isCopied = ref(false);
-function copyToClipboard() {
+const isCopyMode = ref(true);
+async function copyToClipboard() {
+  isCopyMode.value = false;
+  await nextTick();
+
   const container = document.querySelector("#endPointReader");
-  if (!container) return;
+  if (!container) {
+    isCopyMode.value = true;
+    return;
+  }
   const clone = container.cloneNode(true) as HTMLElement;
-
-  // Remove unselected Operations
-  clone
-    .querySelectorAll('[id^="collapse-container-"]')
-    .forEach((collapseEl) => {
-      const match = collapseEl.id.match(/^collapse-container-(.+)-(.+)$/);
-      if (!match) return;
-      const [, path, operation] = match;
-      if (!selectedOperations.value[path]?.includes(operation)) {
-        collapseEl.remove();
-      }
-    });
-
-  // Remove unselected Tags
-  clone.querySelectorAll("#tag").forEach((tagEl) => {
-    const tagName = tagEl.querySelector("h3")?.textContent?.trim();
-    if (tagName && !selectedTags.value.includes(tagName)) {
-      tagEl.remove();
-    }
-  });
 
   // Add styles to tables and cells
   clone.querySelectorAll("table, th, td").forEach((el) => {
@@ -293,8 +299,9 @@ function copyToClipboard() {
   const data = [new ClipboardItem({ "text/html": blob })];
   navigator.clipboard.write(data).then(() => {
     isCopied.value = true;
-    setTimeout(() => (isCopied.value = false), 1500);
+    isCopyMode.value = true;
   });
+  setTimeout(() => (isCopied.value = false), 1500);
 }
 
 function convertOpenApiData() {
@@ -305,7 +312,11 @@ function convertOpenApiData() {
   );
 }
 
-function addOrRemoveOperation(path: string, operation: string) {
+function addOrRemoveOperation(
+  path: string,
+  operation: string,
+  tagName?: string,
+) {
   const ops = selectedOperations.value[path] ?? [];
   const idx = ops.indexOf(operation);
   if (idx === -1) {
@@ -319,14 +330,29 @@ function addOrRemoveOperation(path: string, operation: string) {
       delete selectedOperations.value[path];
     }
   }
+
+  if (tagName) {
+    const matchingOps = getOperationsByTagName(tagName);
+    const anySelected = matchingOps.some(([p, op]) =>
+      selectedOperations.value[p]?.includes(op),
+    );
+    if (anySelected && !isTagNotFullyChecked(tagName)) {
+      if (!selectedTags.value.includes(tagName)) {
+        selectedTags.value.push(tagName);
+      }
+    } else {
+      selectedTags.value = selectedTags.value.filter((tag) => tag !== tagName);
+    }
+  }
 }
 
 function toggleAll() {
   selectedOperations.value = {};
+  selectedTags.value = [];
 
   const paths = oasApiDocument.value?.paths;
-  if (!isAllChecked.value && paths) {
-    for (const [path, methods] of Object.entries(paths)) {
+  if (!isAllChecked.value) {
+    for (const [path, methods] of Object.entries(paths ?? {})) {
       if (!methods) continue;
       for (const [operation, method] of Object.entries(methods)) {
         if (typeof method !== "string" && "tags" in method) {
@@ -334,6 +360,9 @@ function toggleAll() {
         }
       }
     }
+    selectedTags.value = (oasApiDocument.value?.tags ?? []).map(
+      (tag) => tag.name,
+    );
   }
 }
 
@@ -394,30 +423,41 @@ function formatDescription(description?: string): string {
   );
 }
 
-watch(
-  selectedOperations,
-  () => {
-    selectedTags.value = [];
-    for (const [path, operations] of Object.entries(selectedOperations.value)) {
-      const methods = oasApiDocument.value?.paths?.[path] ?? {};
+function getUnknownTags() {
+  const knownTags = new Set(
+    (oasApiDocument.value?.tags ?? []).map((t) => t.name),
+  );
+  const usedTags = new Set<string>();
 
-      for (const operation of operations) {
-        const method = methods[operation as keyof typeof methods];
-        if (method && typeof method !== "string" && "tags" in method) {
-          for (const tag of method.tags || []) {
-            if (!selectedTags.value.includes(tag)) {
-              selectedTags.value.push(tag);
-            }
-          }
+  const paths = oasApiDocument.value?.paths ?? {};
+  for (const methods of Object.values(paths)) {
+    if (!methods) continue;
+    for (const method of Object.values(methods)) {
+      if (
+        typeof method === "object" &&
+        method !== null &&
+        "tags" in method &&
+        Array.isArray(method.tags)
+      ) {
+        for (const tag of method.tags) {
+          usedTags.add(tag);
         }
       }
     }
+  }
 
+  return Array.from(usedTags).filter((tag) => !knownTags.has(tag));
+}
+
+watch(
+  selectedOperations,
+  () => {
     isAllChecked.value =
       Object.keys(selectedOperations.value).length ===
       Object.keys(oasApiDocument.value?.paths ?? {}).length;
+
     isNotFullyChecked.value =
-      !isAllChecked.value && Object.keys(selectedOperations.value).length !== 0;
+      Object.keys(selectedOperations.value).length !== 0;
   },
   { deep: true },
 );
