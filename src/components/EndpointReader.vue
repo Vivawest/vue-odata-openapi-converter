@@ -3,18 +3,18 @@
     <div id="endPointReader" class="p-4">
       <h2>{{ oasApiDocument.info.title }}</h2>
       <span v-html="formatDescription(oasApiDocument.info.description)"></span>
-      <div v-for="tag in oasApiDocument.tags" :key="tag.name">
+      <div v-for="tag in allTags" :key="tag">
         <div id="tag" class="flex gap-3">
-          <h3 v-if="isCopyMode || selectedTags.includes(tag.name)" class="my-3">
-            {{ tag.name }}
+          <h3 v-if="isCopyMode || hasSelectedOperation(tag)" class="my-3">
+            {{ tag }}
           </h3>
           <BaseCheckbox
-            :id="tag.name"
-            :name="tag.name"
+            :id="tag"
+            :name="tag"
             class="mr-2"
-            :modelValue="selectedTags.includes(tag.name)"
-            :disabled-icon="isTagNotFullyChecked(tag.name) ? 'mdi:minus' : ''"
-            @click.stop="toggleTag(tag.name)"
+            :modelValue="selectedTags.includes(tag)"
+            :disabled-icon="isTagNotFullyChecked(tag) ? 'mdi:minus' : ''"
+            @click.stop="toggleTag(tag)"
           />
         </div>
         <template v-if="oasApiDocument?.paths">
@@ -31,7 +31,7 @@
                   v-if="
                     typeof method !== 'string' &&
                     'tags' in method &&
-                    methodHasTag(method, tag.name)
+                    methodHasTag(method, tag)
                   "
                 >
                   <CollapseContainer
@@ -51,9 +51,7 @@
                         :modelValue="
                           selectedOperations[path]?.includes(operation)
                         "
-                        @click.stop="
-                          addOrRemoveOperation(path, operation, tag.name)
-                        "
+                        @click.stop="addOrRemoveOperation(path, operation, tag)"
                       />
                     </template>
                     <template #expandTitle>
@@ -196,7 +194,7 @@
 </template>
 
 <script setup lang="ts">
-import { nextTick, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onMounted, ref, watch } from "vue";
 import CollapseContainer from "./CollapseContainer.vue";
 import Oas from "oas";
 import type { OAS31Document } from "oas/types";
@@ -214,6 +212,32 @@ const selectedTags = ref<string[]>([]);
 
 const isAllChecked = ref(true);
 const isNotFullyChecked = ref(false);
+
+function hasSelectedOperation(tag: string): boolean {
+  const operation = getOperationsByTagName(tag);
+  return operation.some(([path, operation]) =>
+    selectedOperations.value[path]?.includes(operation),
+  );
+}
+
+const allTags = computed(() => {
+  const tags: string[] = [];
+
+  const paths = oasApiDocument.value?.paths ?? {};
+  for (const methods of Object.values(paths)) {
+    if (!methods) continue;
+    for (const method of Object.values(methods)) {
+      if (typeof method === "object" && method !== null && "tags" in method) {
+        for (const tag of method.tags ?? []) {
+          if (!tags.includes(tag)) {
+            tags.push(tag);
+          }
+        }
+      }
+    }
+  }
+  return tags;
+});
 
 function isTagNotFullyChecked(tagName: string): boolean {
   const operation = getOperationsByTagName(tagName);
@@ -360,9 +384,7 @@ function toggleAll() {
         }
       }
     }
-    selectedTags.value = (oasApiDocument.value?.tags ?? []).map(
-      (tag) => tag.name,
-    );
+    selectedTags.value = allTags.value;
   }
 }
 
@@ -423,32 +445,6 @@ function formatDescription(description?: string): string {
   );
 }
 
-function getUnknownTags() {
-  const knownTags = new Set(
-    (oasApiDocument.value?.tags ?? []).map((t) => t.name),
-  );
-  const usedTags = new Set<string>();
-
-  const paths = oasApiDocument.value?.paths ?? {};
-  for (const methods of Object.values(paths)) {
-    if (!methods) continue;
-    for (const method of Object.values(methods)) {
-      if (
-        typeof method === "object" &&
-        method !== null &&
-        "tags" in method &&
-        Array.isArray(method.tags)
-      ) {
-        for (const tag of method.tags) {
-          usedTags.add(tag);
-        }
-      }
-    }
-  }
-
-  return Array.from(usedTags).filter((tag) => !knownTags.has(tag));
-}
-
 watch(
   selectedOperations,
   () => {
@@ -472,7 +468,7 @@ onMounted(async () => {
     oasApiDocument.value = oas.api as OAS31Document;
 
     const paths = oasApiDocument.value?.paths;
-    if (!paths) return [];
+    if (!paths) return;
 
     selectedOperations.value = {};
     for (const [path, methods] of Object.entries(paths)) {
@@ -485,9 +481,7 @@ onMounted(async () => {
     }
 
     selectedTags.value = [];
-    selectedTags.value = (oasApiDocument.value.tags ?? []).map(
-      (tag) => tag.name,
-    );
+    selectedTags.value = allTags.value;
   } catch (err) {
     console.error("Failed to parse OpenAPI data:", err);
   }
