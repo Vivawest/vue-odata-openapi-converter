@@ -1,7 +1,16 @@
-version: "3.8"
-
 services:
-  pdf-gen:
-    build: .
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
     ports:
-      - "5371:80"
+      - "3000:3000"
+  nginx-proxy:
+    image: nginx:alpine
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./dist:/usr/share/nginx/html:ro
+    depends_on:
+      - app

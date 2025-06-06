@@ -10,6 +10,7 @@ import Oas from "oas";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
+const port = 3000;
 
 const tempDir = path.resolve(__dirname, "temp");
 if (!fs.existsSync(tempDir)) {
@@ -18,7 +19,8 @@ if (!fs.existsSync(tempDir)) {
 
 app.use(express.json());
 
-app.post("/convert-to-openapi", async (req: Request, res: Response): Promise<void> => {
+app.post("/api/convert-to-openapi", async (req: Request, res: Response): Promise<void> => {
+
   let { xmlData } = req.body;
   const { url } = req.body;
 
@@ -28,6 +30,7 @@ app.post("/convert-to-openapi", async (req: Request, res: Response): Promise<voi
       xmlData = await response.text();
     } catch {
       res.status(500).json({ error: "Failed to fetch XML from URL" });
+      return;
     }
   }
 
@@ -35,6 +38,7 @@ app.post("/convert-to-openapi", async (req: Request, res: Response): Promise<voi
   const result = XMLValidator.validate(xmlData);
   if (result !== true) {
     res.status(400).json({ error: "Invalid XML format" });
+    return;
   }
 
   const customHeadersRaw = req.headers["custom-headers"];
@@ -60,21 +64,26 @@ app.post("/convert-to-openapi", async (req: Request, res: Response): Promise<voi
   const command = `odata-openapi3 --target "${openapiPath}" "${metadataPath}"`;
   exec(command, (error, stdout, stderr) => {
     if (error || stderr) {
-      return res.status(500).json({ error: (error || stderr).toString() });
+      res.status(500).json({ error: JSON.stringify(error || stderr).toString() });
+      return;
     }
+
     const openApi = fs.readFileSync(openapiPath, "utf8");
     if (!openApi) {
-      return res.status(500).json({ error: "Failed to read OpenAPI file" });
+      res.status(500).json({ error: "Failed to read OpenAPI file" });
+      return;
     }
 
     const openApiJson: OpenAPIV3.Document = JSON.parse(openApi);
 
     if (!customHeaders) {
-      return res.json({
+      res.json({
         xmlData: JSON.stringify(xmlData),
         openapi: openApi,
       });
+      return;
     }
+
     for (const [, pathValue] of Object.entries(openApiJson.paths)) {
       // Each `pathValue` represents the details of a specific API path (e.g., `/users`, `/orders`).
       if (!pathValue) continue;
@@ -102,11 +111,12 @@ app.post("/convert-to-openapi", async (req: Request, res: Response): Promise<voi
   });
 });
 
-app.post("/process-openapi", async (req: Request, res: Response): Promise<void> => {
+app.post("/api/process-openapi", async (req: Request, res: Response): Promise<void> => {
   try {
-    const openApi = fs.readFileSync("temp/openApi.json", "utf8");
+    const openApi = fs.readFileSync(path.join(__dirname, "temp/openapi.json"), "utf8");
     if (!openApi) {
       res.status(500).json({ error: "Failed to read OpenAPI file" });
+      return;
     }
 
     const openApiJson = JSON.parse(openApi);
@@ -121,22 +131,6 @@ app.post("/process-openapi", async (req: Request, res: Response): Promise<void> 
   }
 });
 
-const server = app.listen(0, () => {
-  const address = server.address();
-  const port =
-    typeof address === "object" && address !== null ? address.port : "";
-  console.log("Listening on port:", port);
-
-  if (port) {
-    // Write the port to a file for use in the Vite config
-    fs.writeFileSync(
-      path.resolve(__dirname, "backend-port.txt"),
-      port.toString(),
-    );
+app.listen(port, "0.0.0.0", () => {
     console.log("Listening on port:", port);
-  } else {
-    console.error(
-      "Could not determine port. Is the server running on a socket?",
-    );
-  }
 });
