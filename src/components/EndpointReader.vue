@@ -194,7 +194,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onMounted, ref } from "vue";
 import CollapseContainer from "./CollapseContainer.vue";
 import Oas from "oas";
 import type { OAS31Document } from "oas/types";
@@ -210,15 +210,18 @@ const oasApiDocument = ref<OpenAPIV3_1.Document>();
 const selectedOperations = ref<Record<string, string[]>>({});
 const selectedTags = ref<string[]>([]);
 
-const isAllChecked = ref(true);
-const isNotFullyChecked = ref(false);
-
-function hasSelectedOperation(tag: string): boolean {
-  const operation = getOperationsByTagName(tag);
-  return operation.some(([path, operation]) =>
-    selectedOperations.value[path]?.includes(operation),
+const isAllChecked = computed(() => {
+  const paths = oasApiDocument.value?.paths ?? {};
+  return (
+    Object.keys(selectedOperations.value).length === Object.keys(paths).length
   );
-}
+});
+
+const isNotFullyChecked = computed(() => {
+  return (
+    Object.keys(selectedOperations.value).length !== 0 && !isAllChecked.value
+  );
+});
 
 const allTags = computed(() => {
   const tags: string[] = [];
@@ -238,6 +241,13 @@ const allTags = computed(() => {
   }
   return tags;
 });
+
+function hasSelectedOperation(tag: string): boolean {
+  const operation = getOperationsByTagName(tag);
+  return operation.some(([path, operation]) =>
+    selectedOperations.value[path]?.includes(operation),
+  );
+}
 
 function isTagNotFullyChecked(tagName: string): boolean {
   const operation = getOperationsByTagName(tagName);
@@ -444,19 +454,6 @@ function formatDescription(description?: string): string {
     '<a href="$2" target="_blank" class="text-blue-500 underline">$1</a>',
   );
 }
-
-watch(
-  selectedOperations,
-  () => {
-    isAllChecked.value =
-      Object.keys(selectedOperations.value).length ===
-      Object.keys(oasApiDocument.value?.paths ?? {}).length;
-
-    isNotFullyChecked.value =
-      Object.keys(selectedOperations.value).length !== 0;
-  },
-  { deep: true },
-);
 
 onMounted(async () => {
   try {
