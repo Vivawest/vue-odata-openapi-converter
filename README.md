@@ -8,6 +8,8 @@ Node.js and npm (or yarn) installed on your system.
 
 For running the app inside a Docker container, you need to have Docker (and Docker-Compose) installed.
 
+If you use Docker-Compose you have to copy the `.env.example` to a `.env`-File and configure the ports as needed.
+
 ## Project Setup
 
 ```sh
