@@ -2,7 +2,7 @@ FROM node:24-alpine AS build-stage
 WORKDIR /app
 COPY package*.json ./
 COPY tsconfig*.json ./
-COPY . .
+COPY ../.. .
 RUN npm install
 RUN npm run build:server
 RUN npm run build
