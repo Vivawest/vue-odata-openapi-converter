@@ -124,7 +124,7 @@ app.post("/api/process-openapi", async (req: Request, res: Response): Promise<vo
     const oas = new Oas(openApiJson);
     await oas.dereference();
 
-    res.json(JSON.stringify({ dereferencedData: oas.api }));
+    res.json(JSON.stringify({ dereferencedData: oas }));
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     res.status(500).json({ error: message });
