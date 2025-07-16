@@ -1,7 +1,15 @@
-version: "3.8"
-
 services:
-  pdf-gen:
-    build: .
+  app:
+    build:
+      context: .
+      dockerfile: infrastructure/backend/Dockerfile
     ports:
-      - "5371:80"
+      - "${APP_PORT}:3000"
+  nginx-proxy:
+    build:
+        context: .
+        dockerfile: infrastructure/frontend/Dockerfile
+    ports:
+      - "${NGINX_PORT}:8080"
+    depends_on:
+      - app

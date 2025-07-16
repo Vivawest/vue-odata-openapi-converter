@@ -192,7 +192,7 @@ async function convertToOpenApi() {
   isLoading.value = true;
   errorMessage.value = "";
 
-  const response = await fetch("/convert-to-openapi", {
+  const response = await fetch("/api/convert-to-openapi", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

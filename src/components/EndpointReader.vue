@@ -457,7 +457,7 @@ function formatDescription(description?: string): string {
 
 onMounted(async () => {
   try {
-    const response = await fetch("/process-openapi", {
+    const response = await fetch("/api/process-openapi", {
       method: "POST",
     });
     const data = await response.json();
