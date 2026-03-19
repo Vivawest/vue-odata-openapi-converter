@@ -397,11 +397,17 @@ function addOrRemoveOperation(
 }
 
 function toggleAll() {
+  // isAllChecked is computed based on selectedOperations.
+  // Thus we need to pre-store it in a var before we overwrite selectedOperations,
+  // otherwise !isAllChecked.value will always be true and the deselection would
+  // not work
+  const shouldSelectAll = !isAllChecked.value;
+
   selectedOperations.value = {};
   selectedTags.value = [];
 
   const paths = oasApiDocument.value?.paths;
-  if (!isAllChecked.value) {
+  if (shouldSelectAll) {
     for (const [path, methods] of Object.entries(paths ?? {})) {
       if (!methods) continue;
       for (const [operation, method] of Object.entries(methods)) {
