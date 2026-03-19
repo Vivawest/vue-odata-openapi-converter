@@ -131,9 +131,16 @@ app.post("/api/process-openapi", async (req: Request, res: Response): Promise<vo
     await oas.dereference();
 
     const dereferencedOpenApi = oas.api as OpenAPIV3.Document;
-    const processedOpenApi = selectedOperations
-      ? reducer(dereferencedOpenApi as unknown as Parameters<typeof reducer>[0], { paths: selectedOperations }) as OpenAPIV3.Document
-      : dereferencedOpenApi;
+    let processedOpenApi: OpenAPIV3.Document;
+    if (!selectedOperations) {
+      // No filter sent → return full document
+      processedOpenApi = dereferencedOpenApi;
+    } else if (Object.keys(selectedOperations).length === 0) {
+      // Empty selection → return document with no paths
+      processedOpenApi = { ...dereferencedOpenApi, paths: {} };
+    } else {
+      processedOpenApi = reducer(dereferencedOpenApi as unknown as Parameters<typeof reducer>[0], { paths: selectedOperations }) as OpenAPIV3.Document;
+    }
 
     res.json({ openapi: processedOpenApi });
   } catch (error) {
