@@ -196,12 +196,9 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref } from "vue";
 import CollapseContainer from "./CollapseContainer.vue";
-import Oas from "oas";
-import type { OAS31Document } from "oas/types";
 import type { OpenAPIV3_1 } from "openapi-types";
 import BaseCheckbox from "./inputs/BaseCheckbox.vue";
 import BaseButton from "./inputs/BaseButton.vue";
-import reducer from "oas/reducer";
 import { Icon } from "@iconify/vue";
 
 const openApiData = defineModel<string | undefined>("modelValue");
@@ -341,9 +338,28 @@ async function copyToClipboard() {
 function convertOpenApiData() {
   if (!oasApiDocument.value) return;
 
-  openApiData.value = JSON.stringify(
-    reducer(oasApiDocument.value, { paths: selectedOperations.value }),
-  );
+  fetch("/api/process-openapi", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      selectedOperations: selectedOperations.value,
+    }),
+  })
+    .then(async (response) => {
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to process OpenAPI data");
+      }
+      return response.json();
+    })
+    .then((data) => {
+      openApiData.value = JSON.stringify(data.openapi);
+    })
+    .catch((error) => {
+      console.error("Failed to convert OpenAPI data:", error);
+    });
 }
 
 function addOrRemoveOperation(
@@ -459,10 +475,19 @@ onMounted(async () => {
   try {
     const response = await fetch("/api/process-openapi", {
       method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({}),
     });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || "Failed to process OpenAPI data");
+    }
+
     const data = await response.json();
-    const oas = new Oas(JSON.parse(data).dereferencedData.api);
-    oasApiDocument.value = oas.api as OAS31Document;
+    oasApiDocument.value = data.openapi as OpenAPIV3_1.Document;
 
     const paths = oasApiDocument.value?.paths;
     if (!paths) return;

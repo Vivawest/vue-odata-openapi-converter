@@ -7,6 +7,7 @@ import { fileURLToPath } from "url";
 import { XMLValidator } from "fast-xml-parser";
 import { OpenAPIV3 } from "openapi-types";
 import Oas from "oas";
+import reducer from "oas/reducer";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -113,18 +114,28 @@ app.post("/api/convert-to-openapi", async (req: Request, res: Response): Promise
 
 app.post("/api/process-openapi", async (req: Request, res: Response): Promise<void> => {
   try {
+    const { selectedOperations } = req.body as {
+      selectedOperations?: Record<string, string[]>;
+    };
+
     const openApi = fs.readFileSync(path.join(__dirname, "temp/openapi.json"), "utf8");
     if (!openApi) {
       res.status(500).json({ error: "Failed to read OpenAPI file" });
       return;
     }
 
-    const openApiJson = JSON.parse(openApi);
+    const openApiJson: OpenAPIV3.Document = JSON.parse(openApi);
 
-    const oas = new Oas(openApiJson);
+    const oasInput = openApiJson as OpenAPIV3.Document & Record<string, unknown>;
+    const oas = new Oas(oasInput);
     await oas.dereference();
 
-    res.json(JSON.stringify({ dereferencedData: oas }));
+    const dereferencedOpenApi = oas.api as OpenAPIV3.Document;
+    const processedOpenApi = selectedOperations
+      ? reducer(dereferencedOpenApi as unknown as Parameters<typeof reducer>[0], { paths: selectedOperations }) as OpenAPIV3.Document
+      : dereferencedOpenApi;
+
+    res.json({ openapi: processedOpenApi });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     res.status(500).json({ error: message });
