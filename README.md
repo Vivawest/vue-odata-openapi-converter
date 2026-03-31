@@ -55,3 +55,7 @@ docker run -d \
 ```sh
 docker-compose up -d
 ```
+
+## Local CI / GitHub Actions testing
+
+If you want to run the Docker GitHub Actions workflow locally (e.g. before changing the release pipeline), see [`docs/local-github-actions-testing.md`](docs/local-github-actions-testing.md).
