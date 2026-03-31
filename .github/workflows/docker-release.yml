@@ -1,0 +1,35 @@
+name: Docker Release / Manual Build
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Image-Tag (nur für manuelle Runs). Beispiel: 1.2.3-test"
+        required: true
+        default: "0.0.0-dev"
+      push:
+        description: "Images nach GHCR pushen (für Tests i.d.R. false)"
+        required: true
+        type: boolean
+        default: false
+
+concurrency:
+  group: docker-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    if: ${{ github.event_name == 'release' }}
+    uses: ./.github/workflows/_docker-build.yml
+    with:
+      mode: release
+
+  manual:
+    if: ${{ github.event_name == 'workflow_dispatch' }}
+    uses: ./.github/workflows/_docker-build.yml
+    with:
+      mode: manual
+      version: ${{ github.event.inputs.version }}
+      push: ${{ github.event.inputs.push == 'true' }}
