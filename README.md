@@ -56,6 +56,40 @@ docker run -d \
 docker-compose up -d
 ```
 
+## Run using pre-built images from GHCR (docker-compose)
+
+If you don't want to build images locally, you can run the published images from **GitHub Container Registry (GHCR)**.
+
+> If the packages are **Public**, no `docker login` is required.
+
+Create a `docker-compose.yml` like this (optionally add the tag):
+
+```yaml
+services:
+  app:
+    image: ghcr.io/Vivawest/vue-odata-openapi-converter-backend:latest
+    ports:
+      - "3000:3000"
+
+  nginx-proxy:
+    image: ghcr.io/Vivawest/vue-odata-openapi-converter-frontend:latest
+    ports:
+      - "8080:8080"
+    depends_on:
+      - app
+```
+
+Start it:
+
+```sh
+docker compose up -d
+```
+
+Then open:
+
+- Frontend: http://localhost:8080
+- Backend: http://localhost:3000
+
 ## Local CI / GitHub Actions testing
 
 If you want to run the Docker GitHub Actions workflow locally (e.g. before changing the release pipeline), see [`docs/local-github-actions-testing.md`](docs/local-github-actions-testing.md).
